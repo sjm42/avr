@@ -4,8 +4,11 @@
 #include "LedControl.h"
 
 
-#define INTERVAL 1000  // milliseconds
+#define INTERVAL 500  // milliseconds
 #define MAX_W 3600
+#define PCT_STEP 2
+#define PCT_MIN 0
+#define PCT_MAX 100
 
 LedControl led(4, 5, 6, 1);
 #define PIN_LED 13
@@ -46,7 +49,8 @@ void int_pina() {
   cli();
   reading = PIND & 0x0C;
   if(reading == B00001100 && flag_a) {
-      if (pct > 0) --pct;
+      pct -= PCT_STEP;
+      if (pct < PCT_MIN) pct = PCT_MIN;
       flag_b = 0;
       flag_a = 0;
   }
@@ -59,7 +63,8 @@ void int_pinb() {
   cli();
   reading = PIND & 0x0C;
   if (reading == B00001100 && flag_b) {
-      if (pct < 100) ++pct;
+      pct += PCT_STEP;
+      if (pct > PCT_MAX) pct = PCT_MAX;
       flag_b = 0;
       flag_a = 0;
   }
@@ -91,6 +96,7 @@ void setup()
 {
     pinMode(PIN_LED, OUTPUT);
     Serial.begin(115200);
+    digitalWrite(PIN_LED, LOW);
 
     pinMode(renc_pina, INPUT_PULLUP);
     pinMode(renc_pinb, INPUT_PULLUP);
@@ -104,9 +110,6 @@ void setup()
     /* and clear the display */
     led.clearDisplay(0);
 
-    digitalWrite(PIN_LED, HIGH);
-    delay(3000);
-    digitalWrite(PIN_LED, LOW);
     pct = 0;
     pct_last = pct;
     Serial.println("Setup() complete.");
@@ -143,12 +146,16 @@ void loop()
 
 #if 0
             if (updown > 0) {
-                if (++pct == 100) {
+               pct += PCT_STEP;
+                if (pct >= 100) {
+                    pct = 100;
                     updown = -1;
                 }
             }
             else {
-                if (--pct == 0) {
+                pct -= PCT_STEP;
+                if (pct <= 0) {
+                    pct = 0;
                     updown = 1;
                 }
             }
