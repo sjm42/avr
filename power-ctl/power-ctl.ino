@@ -135,31 +135,6 @@ void loop()
             t_next = tt + INTERVAL;
             t_on = tt;
             t_off = tt + pct * (INTERVAL/100);
-
-#if 0
-            snprintf(buf, BUFSZ, "t %lu, tt %lu, t_next %lu", t, tt, t_next);
-            Serial.println(buf);
-            snprintf(buf, BUFSZ, "PCT %02d t_on %lu, t_off %lu",
-                     pct, t_on, t_off);
-            Serial.println(buf);
-#endif
-
-#if 0
-            if (updown > 0) {
-               pct += PCT_STEP;
-                if (pct >= 100) {
-                    pct = 100;
-                    updown = -1;
-                }
-            }
-            else {
-                pct -= PCT_STEP;
-                if (pct <= 0) {
-                    pct = 0;
-                    updown = 1;
-                }
-            }
-#endif
             continue;
         }
 
@@ -176,8 +151,8 @@ void loop()
         if (pct != pct_last) {
             led_pct(pct);
             led_pwr((MAX_W * pct) / 100);
-            //snprintf(buf, BUFSZ, "pct %02d", pct);
-            //Serial.println(buf);
+            // snprintf(buf, BUFSZ, "pct %02d", pct);
+            // Serial.println(buf);
             pct_last = pct;
         }
     }
