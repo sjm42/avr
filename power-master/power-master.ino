@@ -4,14 +4,12 @@
 #include <Wire.h>
 #include "LedControl.h"
 
-
-#define INTERVAL 500  // milliseconds
-#define MAX_W 3600
+#define INT_I2C 1000 // milliseconds
+#define INT_BTN 200 // milliseconds
 #define PCT_STEP 2
 #define PCT_MIN 0
 #define PCT_MAX 100
-
-LedControl led(8, 9, 10, 1);
+#define PIN_BTN 7
 #define PIN_LED 13
 #define I2C_ADDR 69
 #define BUFSZ 80
@@ -45,6 +43,8 @@ volatile byte oldEncPos = 0;
 // interrupt pins before checking to see if we have moved a whole detent
 volatile byte reading = 0;
 
+LedControl led(8, 9, 10, 1);
+
 
 void int_pina() {
   cli();
@@ -75,22 +75,23 @@ void int_pinb() {
 }
 
 
-void led_pwr(unsigned i)
-{
-    i = i > 9999 ? 9999 : i;
-    led.setDigit(0, 3, i / 1000, 0);
-    led.setDigit(0, 2, (i%1000) / 100, 0);
-    led.setDigit(0, 1, (i%100) / 10, 0);
-    led.setDigit(0, 0, i % 10, 0);
-}
-
-void led_pct(unsigned i)
+void led_pct1(unsigned i)
 {
     i = i > 999 ? 999 : i;
     led.setDigit(0, 7, (i%1000) / 100, 0);
     led.setDigit(0, 6, (i%100) / 10, 0);
     led.setDigit(0, 5, i % 10, 0);
 }
+
+
+void led_pct2(unsigned i)
+{
+    i = i > 999 ? 999 : i;
+    led.setDigit(0, 2, (i%1000) / 100, 0);
+    led.setDigit(0, 1, (i%100) / 10, 0);
+    led.setDigit(0, 0, i % 10, 0);
+}
+
 
 
 void recv_i2c(int n)
@@ -115,14 +116,13 @@ void setup()
 {
     pinMode(PIN_LED, OUTPUT);
     digitalWrite(PIN_LED, LOW);
-    Serial.begin(115200);
-    Wire.begin(I2C_ADDR);
-    Wire.onReceive(recv_i2c);
-    Wire.onRequest(send_i2c);
+    pinMode(PIN_BTN, INPUT_PULLUP);
     pinMode(renc_pina, INPUT_PULLUP);
     pinMode(renc_pinb, INPUT_PULLUP);
     attachInterrupt(0, int_pina, RISING);
     attachInterrupt(1, int_pinb, RISING);
+    Wire.begin();
+    Serial.begin(115200);
 
     /*The MAX72XX is in power-saving mode on startup*/
     led.shutdown(0, false);
@@ -139,43 +139,49 @@ void setup()
 
 void loop()
 {
-    unsigned long t, tt, t_on, t_off, t_next;
-    signed char updown = 1;
-    unsigned char n;
+    unsigned int n;
+    unsigned long t, t_next_i2c, t_next_btn;
+    signed char pct_r;
 
-    delay(INTERVAL - (millis()%INTERVAL));
-    t_next = 0;
-
-    Serial.println("Starting loop");
-    led_pct(pct);
-    led_pwr((MAX_W * pct) / 100);
-
+    t_next_i2c = 0;
+    t_next_btn = 0;
+    pct_r = 0;
     n = 0;
+
+    led_pct1(pct);
+    Serial.println("Starting loop");
     while(1) {
         ++n;
         t = millis();
-        tt = t - (t%INTERVAL);
-        if (t > t_next) {
-            t_next = tt + INTERVAL;
-            t_on = tt;
-            t_off = tt + pct * (INTERVAL/100);
-            continue;
+
+        if (t > t_next_btn) {
+            t_next_btn = t + INT_BTN;
+            if (!digitalRead(PIN_BTN)) {
+                Serial.println("*** BTN ***");
+                Wire.beginTransmission(I2C_ADDR);
+                Wire.write('P');
+                Wire.write(pct);
+                Wire.endTransmission();
+            }
         }
 
-        if (pct > 0 && t >= t_on && t < t_off) {
-            // led ON
-            digitalWrite(PIN_LED, HIGH);
+        if (t > t_next_i2c) {
+            t_next_i2c = t + INT_I2C;
+            Serial.println("I2C req");
+            Wire.requestFrom(I2C_ADDR, 1);
+            delay(20);
+            while (Wire.available()) {
+                Serial.println("I2C read");
+                pct_r = Wire.read();
+            }
+            led_pct2(pct_r);
         }
-        else if (t >= t_off) {
-            // led OFF
-            digitalWrite(PIN_LED, LOW);
-        }
+
 
         // do other stuff here
 
         if (pct != pct_last) {
-            led_pct(pct);
-            led_pwr((MAX_W * pct) / 100);
+            led_pct1(pct);
             // snprintf(buf, BUFSZ, "pct %02d", pct);
             // Serial.println(buf);
             pct_last = pct;
