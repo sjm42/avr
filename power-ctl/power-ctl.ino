@@ -6,7 +6,8 @@
 
 
 #define INTERVAL 500  // milliseconds
-#define MAX_W 3600
+// #define MAX_W 3600
+#define MAX_W 4500
 #define PCT_STEP 2
 #define PCT_MIN 0
 #define PCT_MAX 100

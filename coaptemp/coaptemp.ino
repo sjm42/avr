@@ -12,8 +12,6 @@
 #include "coap_client.h"
 
 
-// #define FINNISH
-
 #define HW_RESET D2
 
 #define LML 80
@@ -21,15 +19,13 @@
 #define NTP_WAIT 1000
 #define NTP_AT_TIME (1*3600+42*60) // at 01:42 UTC 03:42 EET 04:42 EEST
 
-#if FINNISH
-const char *WDAY[] = { "None", " Su ", " Ma ", " Ti ", " Ke ", " To ", " Pe ", " La " };
-const char *MON[] = { "None", "Tam ", "Hel ", "Maa ", "Huh ", "Tou ", "Kes\xE4",
-                      "Hei ", "Elo ", "Syys", "Loka", "Mar ", "Jou "};
-#else
 const char *WDAY[] = { "None", " Sun", " Mon", " Tue", " Wed", " Thu", " Fri", " Sat" };
+//const char *WDAY[] = { "None", " Su ", " Ma ", " Ti ", " Ke ", " To ", " Pe ", " La " };
+
 const char *MON[] = { "None", " Jan", " Feb", " Mar", " Apr", " May", " Jun",
                       "Jul ", " Aug", " Sep", " Oct", " Nov", " Dec"};
-#endif
+//const char *MON[] = { "None", "Tam ", "Hel ", "Maa ", "Huh ", "Tou ", "Kes\xE4",
+//                      "Hei ", "Elo ", "Syys", "Loka", "Mar ", "Jou "};
 
 
 // data_pin, clk_pin, cs_pin, num_dev
@@ -55,6 +51,7 @@ float out_f = -666;
 IPAddress coap_ip;
 const char *coap_server = "coap.i.siu.ro";
 #define COAP_PORT 5683
+#define COAP_LPORT 5353
 
 
 // NTP time stamp is in the first 48 bytes of the message
@@ -135,16 +132,11 @@ void setup()
 
     Serial.println();
     Serial.println("Hi");
-#ifdef FINNISH
     led_row(0, "P\xE4l ");
     led_row(1, " lit");
     delay(1000);
     led_row(0, "OJEN");
     led_row(1, "NUS!");
-#else
-    led_row(0, " YO ");
-    led_row(1, "DUDE");
-#endif    
     delay(2000);
 
     Serial.println();
@@ -340,13 +332,8 @@ time_t get_ntp(int set_time)
     led_row(0, "resp");
     led_int(1, cb);
     delay(1000);
-#ifdef FINNISH
-    led_row(0, "SAIN");
-    led_row(1, "AJAN");
-#else
-    led_row(0, "GOT ");
-    led_row(1, "TIME");
-#endif
+    led_row(0, "Sain");
+    led_row(1, "ajan");
     delay(2000);
 
     return t;
@@ -436,22 +423,22 @@ void led_time(time_t t)
 
 void led_temp(int t)
 {
-    char buf[8];
-    led_row(0, "Out:");
-    snprintf(buf, 8, "%+2dC ", t);
+    char buf[4];
+    led_row(0, " OUT");
+    snprintf(buf, 4, "%+2dC", t);
     led_row(1, buf);
 }
 
 
 void loop()
 {
-    int a, i, x, out_temp = -666;
-    unsigned f_o, f_m, f_d, f_t;
+    int a, i, x, out_temp = 0;
+    unsigned f_m, f_d, f_t;
 
     unsigned long w;
     time_t t, t_z;
 
-    w=0; f_o=0; f_d=0; f_m=0; f_t=200;
+    w=0; f_o=0; f_d=0; f_m=0; f_t=300;
     while (1) {
         ++w;
         t = now();
@@ -459,14 +446,12 @@ void loop()
 
         if (f_o) {
             // display OUT TEMP
-
-            // have temp yet?
             if (out_f < -660) {
                 f_o = 1;
             }
             else {
                 out_temp = out_f < 0 ? (int)(out_f-0.5) : (int)(out_f+0.5);
-                led_temp(out_temp);
+                led_temp((int)(out_temp));
             }
             if (--f_o == 0) {
                 f_d=30;
@@ -483,7 +468,7 @@ void loop()
             // display month and year
             led_month(t_z);
             if (--f_m == 0) {
-                f_t=200;
+                f_t=300;
             }
         }
         else {
@@ -521,21 +506,19 @@ void loop()
             }
         }
 
-        if (w%300 == 0 && out_f > -660) {
-            Serial.print("OUT temp: "); Serial.println(out_f);
-        }
+        if (w%100 == 0) {
+            int out_temp = out_f < 0 ? (int)(out_f-0.5) : (int)(out_f+0.5);
+            Serial.print("OUT temp: "); Serial.println(out_temp);
 
-        if (out_temp < -660 || w%1000 == 0) {
             WiFi.hostByName(coap_server, coap_ip);
-            // Serial.print("coap ip: "); Serial.println(coap_ip);
+            Serial.print("coap ip: "); Serial.println(coap_ip);
+
             coap.response(coap_callback);
             coap.start();
             int msgid = coap.get(coap_ip, COAP_PORT, "avg_out");
             delay(200);
             bool ret = coap.loop();
             Serial.print("coap_loop() ret="); Serial.println(ret);
-            if (out_temp < -660 && out_f > -660)
-                out_temp = out_f < 0 ? (int)(out_f-0.5) : (int)(out_f+0.5);
         }
 
         if (t > t_next_ntp) {

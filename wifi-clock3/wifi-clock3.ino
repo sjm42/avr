@@ -3,41 +3,46 @@
 #include <stdlib.h>
 #include <ESP8266WiFi.h>
 #include <WiFiUdp.h>
-#include <math.h>
+#include <SPI.h>
+#include <Wire.h>
 
-#include "LedControl.h"
+#include <math.h>
 #include "Time.h"
 #include "Timezone.h"
-#include "font8x8_latin.h"
 #include "coap_client.h"
+#include "Adafruit_GFX.h"
+#include "Adafruit_SSD1306.h"
 
 
 // #define FINNISH
 
-#define HW_RESET D2
+#define HW_RESET D7
+#define OLED_RESET D6
+
+Adafruit_SSD1306 display(OLED_RESET);
+
+
+#if (SSD1306_LCDHEIGHT != 32)
+#error("Height incorrect, please fix Adafruit_SSD1306.h!");
+#endif
+
 
 #define LML 80
+#define ROWLEN 10
 #define WIFI_CONN_WAIT 100
 #define NTP_WAIT 1000
 #define NTP_AT_TIME (1*3600+42*60) // at 01:42 UTC 03:42 EET 04:42 EEST
 
-#if FINNISH
-const char *WDAY[] = { "None", " Su ", " Ma ", " Ti ", " Ke ", " To ", " Pe ", " La " };
-const char *MON[] = { "None", "Tam ", "Hel ", "Maa ", "Huh ", "Tou ", "Kes\xE4",
-                      "Hei ", "Elo ", "Syys", "Loka", "Mar ", "Jou "};
+#ifdef FINNISH
+const char *WDAY[] = { "None", "Su", "Ma", "Ti", "Ke", "To", "Pe", "La" };
+const char *MON[] = { "None", "Tam", "Hel", "Maa", "Huh", "Tou", "Kesa",
+                      "Hei", "Elo", "Syys", "Loka", "Mar", "Jou"};
 #else
-const char *WDAY[] = { "None", " Sun", " Mon", " Tue", " Wed", " Thu", " Fri", " Sat" };
-const char *MON[] = { "None", " Jan", " Feb", " Mar", " Apr", " May", " Jun",
-                      "Jul ", " Aug", " Sep", " Oct", " Nov", " Dec"};
+const char *WDAY[] = { "None", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
+const char *MON[] = { "None", "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
 #endif
 
-
-// data_pin, clk_pin, cs_pin, num_dev
-// LedControl led0(13, 14, 15, 4);
-// LedControl led1(5, 12, 16, 4);
-
-LedControl led0(D7, D5, D8, 4);
-LedControl led1(D1, D6, D0, 4);
 
 TimeChangeRule EEST = {"EEST", Last, Sun, Mar, 2, 180}; // East European Summer Time
 TimeChangeRule EET = {"EET ", Last, Sun, Oct, 3, 120};  // East European Time
@@ -51,7 +56,7 @@ const char *ntp_name = "time.google.com";
 #define NTP_LPORT 4242      // local port to listen for UDP packets
 
 coapClient coap;
-float out_f = -666;
+static float out_f = -666;
 IPAddress coap_ip;
 const char *coap_server = "coap.i.siu.ro";
 #define COAP_PORT 5683
@@ -78,6 +83,9 @@ const char *wifi_ssids[] = {
 
 
 time_t t_begin, t_next_ntp, t_pre_ntp, t_ntp;
+
+static char row0[ROWLEN+1] = {0}, row1[ROWLEN+1] = {0};
+
 
 void coap_callback(coapPacket &packet, IPAddress ip, int port)
 {
@@ -114,50 +122,38 @@ void setup()
     t_pre_ntp = 0;
     t_ntp = 0;
     
-    Serial.begin(115200);
+    Serial.begin(115200); 
+    display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+    display.clearDisplay();
+    display.display();
+
     pinMode(HW_RESET, OUTPUT);
     digitalWrite(HW_RESET, HIGH);
     pinMode(LED_BUILTIN, OUTPUT);
     digitalWrite(LED_BUILTIN, LOW);
-    pinMode(A0, INPUT);
-
-    for (i=0; i<8; ++i){
-        led0.shutdown(i, false);
-        led0.setScanLimit(i, 8);
-        led0.setIntensity(i, 0);
-        led0.clearDisplay(i);
-        led1.shutdown(i, false);
-        led1.setScanLimit(i, 8);
-        led1.setIntensity(i, 0);
-        led1.clearDisplay(i);
-    }
-    delay(100);
 
     Serial.println();
     Serial.println("Hi");
 #ifdef FINNISH
-    led_row(0, "P\xE4l ");
-    led_row(1, " lit");
-    delay(1000);
-    led_row(0, "OJEN");
-    led_row(1, "NUS!");
+    disp_row(0, "Paellit");
+    disp_row(1, "OJENNUS!");
 #else
-    led_row(0, " YO ");
-    led_row(1, "DUDE");
+    disp_row(0, "Yo");
+    disp_row(1, "   DUDE!");
 #endif    
-    delay(2000);
+    delay(5000);
 
     Serial.println();
     Serial.println();
     snprintf(buf, LML, "Have %d WiFi networks to try.", NUM_SSID);
     Serial.println(buf);
-    led_row(0, "WiFi");
-    led_row(1, "init");
-    delay(5000);
+    disp_row(0, "WiFi conn:");
+    disp_row(1, "...");
+    delay(2000);
 
     for (c=0, i=0; i<NUM_SSID && !c; ++i) {
         snprintf(buf, 8, "c %02d", i);
-        led_row(1, buf);
+        disp_row(1, buf);
         delay(1000);
 
         Serial.print("\nTrying \"");
@@ -169,7 +165,7 @@ void setup()
             Serial.print(".");
             if (WiFi.status() == WL_CONNECTED) {
                 Serial.println("OK!");
-                led_row(1, " OK!");
+                disp_row(1, "OK!");
                 c = 1;
                 break;
             }
@@ -180,8 +176,6 @@ void setup()
 
     if(!c) {
         Serial.println("No Wifi connection!");
-        led_row(0, " NO ");
-        led_row(1, "WIFI");
         delay(2000);
         hw_reset();
     }
@@ -259,8 +253,8 @@ time_t get_ntp(int set_time)
     time_t t, t_z;
     char buf[LML];
 
-    led_row(0,"NTP?");
-    led_row(1, "    ");
+    disp_row(0,"NTP?");
+    disp_row(1, "");
     delay(1000);
 
     ntp_udp.begin(NTP_LPORT);
@@ -277,8 +271,8 @@ time_t get_ntp(int set_time)
     }
 
     if (!cb) {
-        led_row(0, "NTP!");
-        led_row(1, "FAIL");
+        disp_row(0, "NTP FAIL!");
+        disp_row(1, "");
         Serial.println("Timeout.");
         delay(2000);
         return 0;
@@ -305,23 +299,6 @@ time_t get_ntp(int set_time)
     Serial.print("packet received, length=");
     Serial.println(cb);
 
-#if 0
-    // dump NTP reply packet
-    for (w=0; w<cb; ) {
-        snprintf(buf, LML, "%02X", ntp_buf[w]);
-        Serial.print(buf);
-        ++w;
-
-        if (w % 16 == 0) {
-            Serial.println();
-        }
-        else {
-            Serial.print(w % 8 == 0 ? "  " : " ");
-        }
-    }
-    Serial.println();
-#endif
-
     snprintf(buf, LML, "UTC %04d-%02d-%02d %02d:%02d:%02d",
              year(t), month(t), day(t), hour(t), minute(t), second(t));
     Serial.println(buf);
@@ -337,15 +314,14 @@ time_t get_ntp(int set_time)
         Serial.println(buf);
     }
 
-    led_row(0, "resp");
-    led_int(1, cb);
+    disp_row(1, "resp");
     delay(1000);
 #ifdef FINNISH
-    led_row(0, "SAIN");
-    led_row(1, "AJAN");
+    disp_row(0, "SAIN AJAN");
+    disp_row(1, "");
 #else
-    led_row(0, "GOT ");
-    led_row(1, "TIME");
+    disp_row(0, "GOT TIME");
+    disp_row(1, "");
 #endif
     delay(2000);
 
@@ -353,179 +329,92 @@ time_t get_ntp(int set_time)
 }
 
 
-// We have a 4x2 matrix
-// row: 0..1
-// col: 0..3
-int led_char(u8 row, u8 col, u16 chr)
+int disp_row(u8 row, const char *s)
 {
-    const char *chr_d;
-    int x;
-
-    chr_d = NULL;
-    if (row > 1 || col > 3) return 0;
-
-    if (chr >= 0x0000 && chr <= 0x007F) {
-        chr_d = font8x8_basic[chr];
+    switch (row) {
+    case 0:
+        strncpy(row0, s, ROWLEN);
+        break;
+    case 1:
+        strncpy(row1, s, ROWLEN);
+        break;
+    default:
+        return -1;
     }
-    if (chr >= 0x0080 && chr <= 0x009F) {
-        chr_d = font8x8_control[chr-0x0080];
-    }
-    if (chr >= 0x00A0 && chr <= 0x00FF) {
-        chr_d = font8x8_ext_latin[chr-0x00A0];
-    }
-    if (!chr_d) return 0;
 
-    for (x=0; x<8; ++x) {
-        if (row == 0) {
-            led0.setRow(col, 7-x, chr_d[x]);
-        } else {
-            led1.setRow(col, 7-x, chr_d[x]);
-        }
-    }
-    return 1;
+    display.clearDisplay();
+    display.setTextSize(2);
+    display.setTextColor(WHITE);
+    display.setCursor(0, 0);
+    display.print(row0);
+    display.setCursor(0, 18);
+    display.print(row1);
+    display.display();
+
+    return 0;
 }
 
-
-int led_row(u8 row, const char *s)
+void disp_time(time_t t, float temp)
 {
-    int col;
-
-    if (row>1) return 0;
-    for (col=0; col<4; ++col) {
-        if (s[col])
-            led_char(row, col, s[col]);
-        else
-            break;
-    }
-    return col-1;
+    char buf[11];
+    snprintf(buf, 11, " %02d:%02d:%02d", hour(t), minute(t), second(t));
+    disp_row(0, buf);
+    snprintf(buf, 11, " %+.2f C ", temp);
+    disp_row(1, buf);
 }
 
-void led_int(u8 row, int i)
+void disp_date(time_t t)
 {
-    char buf[8];
-    i = i < -999 ? -999 : i;
-    i = i > 9999 ? 9999 : i;
-    snprintf(buf, 8, "%4d", i);
-    led_row(row, buf);
-}
-
-void led_day(time_t t)
-{
-    char buf[8];
-    led_row(0, WDAY[weekday(t)]);
-    snprintf(buf, 8, " %2d. ", day(t));
-    led_row(1, buf);
-}
-
-void led_month(time_t t)
-{
-    char buf[8];
-    led_row(0, MON[month(t)]);
-    snprintf(buf, 8, "%04d", year(t));
-    led_row(1, buf);
-}
-
-void led_time(time_t t)
-{
-    char buf[8];
-    snprintf(buf, 8, "%02d%02d", hour(t), minute(t));
-    led_row(0, buf);
-    snprintf(buf, 8, " :%02d", second(t));
-    led_row(1, buf);
-}
-
-void led_temp(int t)
-{
-    char buf[8];
-    led_row(0, "Out:");
-    snprintf(buf, 8, "%+2dC ", t);
-    led_row(1, buf);
+    char buf[11];
+    snprintf(buf, 11, "%s %d %s", WDAY[weekday(t)], day(t), MON[month(t)]);
+    disp_row(0, buf);
+    snprintf(buf, 11, "%d.%d.%d", day(t), month(t), year(t));
+    disp_row(1, buf);
 }
 
 
 void loop()
 {
-    int a, i, x, out_temp = -666;
-    unsigned f_o, f_m, f_d, f_t;
+    int a, i, x;
+    unsigned f_d, f_t;
 
     unsigned long w;
     time_t t, t_z;
 
-    w=0; f_o=0; f_d=0; f_m=0; f_t=200;
+    w=0; f_d=0; f_t=100;
     while (1) {
         ++w;
         t = now();
         t_z = EE.toLocal(t, &tcr);
 
-        if (f_o) {
-            // display OUT TEMP
+        if (f_d) {
+            // display date
+
+            disp_date(t_z);
+            if (--f_d == 0) {
+                f_t=100;
+            }
+        }
+        else {
+            // display time and out temp
 
             // have temp yet?
             if (out_f < -660) {
-                f_o = 1;
+                f_t = 1;
             }
             else {
-                out_temp = out_f < 0 ? (int)(out_f-0.5) : (int)(out_f+0.5);
-                led_temp(out_temp);
+                disp_time(t_z, out_f);
             }
-            if (--f_o == 0) {
+            if (--f_t == 0) {
                 f_d=30;
             }
         }
-        else if (f_d) {
-            // display weekday and day of month
-            led_day(t_z);
-            if (--f_d == 0) {
-                f_m=30;
-            }
-        }
-        else if (f_m) {
-            // display month and year
-            led_month(t_z);
-            if (--f_m == 0) {
-                f_t=200;
-            }
-        }
-        else {
-            // display time with seconds
-            led_time(t_z);
-            if (--f_t == 0) {
-                f_o=30;
-            }
+
+        if (w % 600 == 0 && out_f > -660.0) {
+            // Serial.print("OUT temp: "); Serial.println(out_f);
         }
 
-        if (w%20 == 0) {
-            a = analogRead(A0);
-            //Serial.print("Analog: ");
-            //Serial.println(a);
-
-            i = (a-200)/100;
-            i = i<0 ? 0 : i;
-            i = i>15 ? 15 : i;
-            //Serial.print("Led intensity: ");
-            //Serial.println(i);
-            for (x=0; x<4; ++x) {
-                led0.setIntensity(x, i);
-                led1.setIntensity(x, i);
-            }
-
-            // Turn off the on-board blue led
-            digitalWrite(LED_BUILTIN, HIGH);
-        }
-        else {
-            // Blink the blue led only when it is not too dark :D
-            // That would disturb sleeping...
-            if (i>4) {
-                // Turn on the on-board blue led
-                // digitalWrite(LED_BUILTIN, LOW);
-            }
-        }
-
-        if (w%300 == 0 && out_f > -660) {
-            Serial.print("OUT temp: "); Serial.println(out_f);
-        }
-
-        if (out_temp < -660 || w%1000 == 0) {
+        if (out_f < -660.0 || w % 1000 == 0) {
             WiFi.hostByName(coap_server, coap_ip);
             // Serial.print("coap ip: "); Serial.println(coap_ip);
             coap.response(coap_callback);
@@ -534,8 +423,6 @@ void loop()
             delay(200);
             bool ret = coap.loop();
             Serial.print("coap_loop() ret="); Serial.println(ret);
-            if (out_temp < -660 && out_f > -660)
-                out_temp = out_f < 0 ? (int)(out_f-0.5) : (int)(out_f+0.5);
         }
 
         if (t > t_next_ntp) {
@@ -543,7 +430,7 @@ void loop()
             Serial.println("Time to make another NTP query.");
             break;
         }
-        delay(100);
+        delay(50);
     }
     // We are rude and give a hardware reset.
     hw_reset();
