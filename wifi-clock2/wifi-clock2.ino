@@ -1,4 +1,4 @@
-// clock-test
+// wifi-clock2.ino
 
 #include <stdlib.h>
 #include <ESP8266WiFi.h>
@@ -53,7 +53,7 @@ const char *ntp_name = "time.google.com";
 coapClient coap;
 float out_f = -666;
 IPAddress coap_ip;
-const char *coap_server = "coap.i.siu.ro";
+const char *coap_server = "coap.siu.ro";
 #define COAP_PORT 5683
 
 
@@ -515,9 +515,9 @@ void loop()
         else {
             // Blink the blue led only when it is not too dark :D
             // That would disturb sleeping...
-            if (i>4) {
-                // Turn on the on-board blue led
-                // digitalWrite(LED_BUILTIN, LOW);
+            if (1) {
+	      // Turn on the on-board blue led
+	      digitalWrite(LED_BUILTIN, LOW);
             }
         }
 
