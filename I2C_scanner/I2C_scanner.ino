@@ -8,12 +8,13 @@
 
 #include <Wire.h>
 
-const int sdaPin = D1;
-const int sclPin = D2;
+// const int sdaPin = 2;
+// const int sclPin = 3;
 
 void setup()
 {
-  Wire.begin(sdaPin, sclPin);
+  // Wire.begin(sdaPin, sclPin);
+  Wire.begin();
 
   Serial.begin(115200);
   Serial.println("I2C Scanner");
@@ -62,6 +63,6 @@ void loop()
     Serial.println("Done.\n");
   }
 
-  delay(2000);
+  delay(20000);
 }
 

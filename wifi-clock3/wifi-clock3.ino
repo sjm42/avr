@@ -17,7 +17,7 @@
 // #define FINNISH
 
 #define HW_RESET D7
-#define OLED_RESET D6
+#define OLED_RESET D8
 
 Adafruit_SSD1306 display(OLED_RESET);
 
@@ -58,8 +58,9 @@ const char *ntp_name = "time.google.com";
 coapClient coap;
 static float out_f = -666;
 IPAddress coap_ip;
-const char *coap_server = "coap.i.siu.ro";
-#define COAP_PORT 5683
+// const char *coap_server = "coap.i.siu.ro";
+const char *coap_server = "siuro.dy.fi";
+#define COAP_PORT 55683
 
 
 // NTP time stamp is in the first 48 bytes of the message

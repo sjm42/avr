@@ -1,7 +1,9 @@
+// led-stripe-demo
+
 #include <FastLED.h>
 
 #define LED_PIN     12
-#define NUM_LEDS    30
+#define NUM_LEDS    120
 #define BRIGHTNESS  64
 #define LED_TYPE    WS2812
 
