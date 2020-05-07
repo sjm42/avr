@@ -160,44 +160,24 @@ static struct et16315_char et16315_fp_chars[] =
  *
  ****************************************************************************************/
 
-static struct et16315_chip chip =
+struct et16315_chip chip =
 {
   .leds        = 0,
-  .mode        = et16315_config_9_digits_19_segments,
+  .mode        = et16315_config_11_digits_17_segments,
   .on          = 1,
   .brightness  = ET16315_MAX_BRIGHT,
   .char_tbl    = et16315_fp_chars,
 };
 
 
-static void et16315_send(byte command, const void *buf, int len)
+void et16315_xfer(byte command, void *buf, int len)
 {
     // Send command and [len] parameter bytes
-    const byte *data = (const byte*)buf;
-    byte i;
-
+    // BEWARE: buf will be overwritten!
     digitalWrite(SS_PIN, LOW);
     SPI.beginTransaction(SPISettings(1000000, LSBFIRST, SPI_MODE3));
     SPI.transfer(command);
-    SPI.transfer((void*)data, len);
-    SPI.endTransaction();
-    digitalWrite(SS_PIN, HIGH);
-}
-
-
-static void et16315_recv(byte command, void *buf, int len)
-{
-    byte *data = (byte*)buf;
-    int i;
-
-    digitalWrite(SS_PIN, LOW);
-    SPI.beginTransaction(SPISettings(1000000, LSBFIRST, SPI_MODE3));
-    SPI.transfer(command);
-
-    for (i = 0; i < len; i++)
-    {
-        data[i] = SPI.transfer(0x00);
-    }
+    if (buf != NULL) SPI.transfer(buf, len);
     SPI.endTransaction();
     digitalWrite(SS_PIN, HIGH);
 }
@@ -208,7 +188,7 @@ void et16315_set_leds(byte leds)
 {
     byte data[1] = { (leds & 0b00001111) ^ 0b00001111 };
     chip.leds = leds;
-    et16315_send(ET16315_CMD2_DATA_SET(0, ET16315_FIXED_ADDR, ET16315_CMD_SET_LED),
+    et16315_xfer(ET16315_CMD2_DATA_SET(0, ET16315_FIXED_ADDR, ET16315_CMD_SET_LED),
                  data, 1);
 }
 
@@ -217,12 +197,10 @@ void et16315_set_leds(byte leds)
 void et16315_clear()
 {
     // clear display RAM
-    memset(chip.display_data, 0, sizeof(chip.display_data));
-    et16315_send(ET16315_CMD2_DATA_SET(0, ET16315_AUTO_ADDR_INC,
-                                       ET16315_CMD_WRITE_DATA),
-                 NULL, 0);
-    et16315_send(ET16315_CMD3_SET_ADDRESS(0), chip.display_data,
-                 sizeof(chip.display_data));
+    memset(chip.display_data, 0x00, sizeof(chip.display_data));
+    memset(chip.scratch, 0x00, sizeof(chip.scratch));
+    et16315_xfer(ET16315_CMD2_DATA_SET(0, 0, ET16315_CMD_WRITE_DATA), NULL, 0);
+    et16315_xfer(ET16315_CMD3_SET_ADDRESS(0), chip.scratch, sizeof(chip.scratch));
 }
 
 
@@ -237,7 +215,7 @@ void et16315_set_brightness(byte brght)
         brght = ET16315_MAX_BRIGHT;
     }
     chip.brightness = brght;
-    et16315_send(ET16315_CMD4_DISPLAY_CONTROL(chip.on, chip.brightness), NULL, 0);
+    et16315_xfer(ET16315_CMD4_DISPLAY_CONTROL(chip.on, chip.brightness), NULL, 0);
 }
 
 
@@ -252,49 +230,79 @@ void et16315_set_light(byte on)
         on = 1;
     }
     chip.on = on;
-    et16315_send(ET16315_CMD4_DISPLAY_CONTROL(chip.on, chip.brightness), NULL, 0);
+    et16315_xfer(ET16315_CMD4_DISPLAY_CONTROL(chip.on, chip.brightness), NULL, 0);
 }
 
 
-void et16315_set_text(const char *text)
+void et16315_set_text(const char *text, int len)
 {
-    byte i, len, digits;
+    byte digits;
+    char i, j;
 
-    digits = chip.mode + 4;
-    len = strlen(text);
+    digits = 8;
     if (len > digits)
     {
         len = digits;
     }
 
-	/* display digits are connected right to left */
-    for (i = 3 * (digits - 1); i > 3 * (digits - 1 - len); i -= 3)
-        {
-        chip.display_data[i]   = chip.char_tbl[*text-0x20].value0;
-        chip.display_data[i+1] = chip.char_tbl[*text-0x20].value1 | (chip.display_data[i+1] & 0b10000000);
-        // chip.display_data[i+2] = chip.char_tbl[*text-0x20].value2;
-        chip.display_data[i+2] = 0;
-        ++text;
+    /* display digits are connected right to left */
+    for (j=0, i = 3 * (digits-1); j<len && i >= 0; ++j, i -= 3)
+    {
+        char c = text[j];
+	if (c < 0x20) c = 0x20;
+	else if (c > 0x7E) c = 0x7E;
+	c -= 0x20;
+
+        chip.display_data[i]   = chip.char_tbl[c].value0;
+        chip.display_data[i+1] = chip.char_tbl[c].value1 | (chip.display_data[i+1] & 0b10000000);
+        chip.display_data[i+2] = chip.char_tbl[c].value2;
+        //chip.display_data[i+2] = 0x00;
     }
-    et16315_send(ET16315_CMD3_SET_ADDRESS(0), chip.display_data, (digits * 3));
+    memcpy(chip.scratch, chip.display_data, digits*3);
+    et16315_xfer(ET16315_CMD2_DATA_SET(0, 0, ET16315_CMD_WRITE_DATA), NULL, 0);
+    et16315_xfer(ET16315_CMD3_SET_ADDRESS(0), chip.scratch, digits*3);
+}
+
+
+void et16315_colon(byte i, byte o)
+{
+    int a;
+    char c;
+
+    if (i > 3) i = 3;
+    a = 3*8 - (3*2*i) + 1;
+    //Serial.print("a: "); Serial.println(a);
+    c = chip.display_data[a];
+    if (o) {
+        c = c | 0b10000000;
+    }
+    else {
+        c = c & 0b01111111;
+    }
+    chip.display_data[a] = c;
+    et16315_xfer(ET16315_CMD2_DATA_SET(0, 1, ET16315_CMD_WRITE_DATA), NULL, 0);
+    et16315_xfer(ET16315_CMD3_SET_ADDRESS(a), &c, 1);
+    delay(10);
 }
 
 
 int et16315_start(void)
 {
-	/* Initialize the ET16315 */
+    /* Initialize the ET16315 */
     pinMode(SS_PIN, OUTPUT);
     SPI.begin();
 
     /* Clear display memory */
-	et16315_clear();
-	/* Set display mode and initial brightness */
-	et16315_send(ET16315_CMD1_SET_DISPLAY_MODE(chip.mode), NULL, 0);
-	// enable display
-	et16315_set_light(1);
-	// set initial brightness
+    et16315_clear();
+    /* Set display mode and initial brightness */
+    Serial.print("Mode: ");
+    Serial.println(chip.mode);
+    et16315_xfer(ET16315_CMD1_SET_DISPLAY_MODE(chip.mode), NULL, 0);
+    // enable display
+    et16315_set_light(1);
+    // set initial brightness
     et16315_set_brightness(ET16315_MAX_BRIGHT);
-	return 0;
+    return 0;
 }
 
 
@@ -339,7 +347,7 @@ int et16315_seticon(int which, int on)
     else {
         chip.display_data[digit_offset] |= 0b10000000;
     }
-    et16315_send(ET16315_CMD3_SET_ADDRESS(0),
+    et16315_xfer(ET16315_CMD3_SET_ADDRESS(0),
                  chip.display_data, (digits * 3));
 
     return ret;

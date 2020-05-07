@@ -87,7 +87,8 @@ struct et16315_chip
 	byte on; // state of display enable
 	byte brightness;
 	struct et16315_char *char_tbl;
-	char display_data[ET16315_DISPLAY_BUFFER_SIZE];
+        byte display_data[ET16315_DISPLAY_BUFFER_SIZE];
+        byte scratch[ET16315_DISPLAY_BUFFER_SIZE];
 };
 
 enum {
@@ -109,14 +110,15 @@ enum {
       ICON_COLON3
 };
 
+void et16315_xfer(byte command, void *buf, int len);
 void et16315_set_leds(byte leds);
 void et16315_clear();
 void et16315_set_brightness(byte brght);
 void et16315_set_light(byte on);
-void et16315_set_text(const char *text);
+void et16315_set_text(const char *text, int len);
 int et16315_start(void);
 int et16315_seticon(int which, int on);
-
+void et16315_colon(byte i, byte o);
 
 
 #endif // _et16315_h
