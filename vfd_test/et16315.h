@@ -4,6 +4,9 @@
 #define _et16315_h
 
 #include <Arduino.h>
+#include <SPI.h>
+
+#define SS_PIN 10
 
 /* Comment or delete next line to enable text
    scrolling in low level VFD driver */
@@ -64,7 +67,7 @@
 		(on ? ET16315_DISPLAY_ENABLE : 0x00) | \
 		(brightness & 0b00000111))
 
-
+#define ET16315_MAX_BRIGHT 7
 #define ET16315_DISPLAY_MAX_DIGITS   12
 #define ET16315_DISPLAY_BUFFER_SIZE  ET16315_DISPLAY_MAX_DIGITS * 3
 
@@ -75,45 +78,46 @@ struct et16315_char
 	byte value2;  // not needed with 15 segment display, always zero
 };
 
-struct et16315_platform_data
-{
-	enum
-	{
-		et16315_config_4_digits_24_segments = 4,
-		et16315_config_5_digits_23_segments,
-		et16315_config_6_digits_22_segments,
-		et16315_config_7_digits_21_segments,
-		et16315_config_8_digits_20_segments,
-		et16315_config_9_digits_19_segments,
-		et16315_config_10_digits_18_segments,
-		et16315_config_11_digits_17_segments,
-		et16315_config_12_digits_16_segments
-	} digits;
-
-	/* LEDs */
-	byte led;
-
-	/* Display control */
-	int        brightness;  /* initial value, 0 (lowest) - 7 (max) */
-	int        on;  /* initial value for display enable */
-	struct     et16315_char *char_tbl;
-	const char *text;  /* initial display text */
-};
-
 struct et16315_chip
 {
-	unsigned gpio_din, gpio_dout, gpio_clk, gpio_stb;  /* Wiring info */
-
-	/* VFD display */
-	int    digits;
-	int    on; // state of display enable
-	int    brightness;
-	byte     last_display[ET16315_DISPLAY_BUFFER_SIZE];
-	struct et16315_char *char_tbl;
-
 	/* LEDs */
-	byte led;
-
+	byte leds;
+	/* VFD display */
+	byte mode;
+	byte on; // state of display enable
+	byte brightness;
+	struct et16315_char *char_tbl;
+	char display_data[ET16315_DISPLAY_BUFFER_SIZE];
 };
+
+enum {
+      et16315_config_4_digits_24_segments = 0,
+      et16315_config_5_digits_23_segments,
+      et16315_config_6_digits_22_segments,
+      et16315_config_7_digits_21_segments,
+      et16315_config_8_digits_20_segments,
+      et16315_config_9_digits_19_segments,
+      et16315_config_10_digits_18_segments,
+      et16315_config_11_digits_17_segments,
+      et16315_config_12_digits_16_segments
+};
+
+enum {
+      ICON_DOT = 42,
+      ICON_COLON1,
+      ICON_COLON2,
+      ICON_COLON3
+};
+
+void et16315_set_leds(byte leds);
+void et16315_clear();
+void et16315_set_brightness(byte brght);
+void et16315_set_light(byte on);
+void et16315_set_text(const char *text);
+int et16315_start(void);
+int et16315_seticon(int which, int on);
+
+
+
 #endif // _et16315_h
 // vim:ts=4

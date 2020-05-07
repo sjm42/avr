@@ -1,12 +1,14 @@
 // vfd_test.ino
 
 #include <stdlib.h>
-#include <SPI.h>
+#include "et16315.h"
 
 #define DEBUG 1
 #define BLEN 40
-#define SS_PIN 10
 static char buf[BLEN];
+
+
+#if 0
 
 void vfd_cmd(byte b)
 {
@@ -41,38 +43,27 @@ void vfd_mode()
     vfd_cmd(0b10001111);
     vfd_cmd(0b01000100);
 }
+#endif
+
 
 void vfd_write()
 {
-    byte i, c;
+    byte i;
+    char buf[9];
 
-    for (i=0; i<0x24; ++i) {
-	vfd_put(i, 0);
+    for (i=0; i<8; ++i) {
+        buf[i] = 0x20 + random(0x60);
     }
-    for (i=0; i<0x24; ++i) {
-	// c = random(0x100);
-	c = 0xff;
-	Serial.println("\nPUT");
-	vfd_put(i, 0);
-	delay(1000);
-	vfd_put(i, c);
-	delay(1000);
-	vfd_put(i, 0);
-	delay(1000);
-	vfd_put(i, c);
-	delay(1000);
-	//vfd_put(i, 0);
-    }
-
+    buf[8] = '\0';
+    et16315_set_text(buf);
 }
+
 
 void setup()
 {
     Serial.begin(115200);
-    pinMode(SS_PIN, OUTPUT);
-    SPI.begin();
     Serial.println("\n\nHi");
-    vfd_mode();
+    et16315_start();
     Serial.println();
     randomSeed(analogRead(0));
     delay(10);
