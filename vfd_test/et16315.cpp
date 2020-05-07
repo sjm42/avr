@@ -12,47 +12,45 @@
  *
  ****************************************************************************************
  *
- * In the Fortis FOREVER_3434HD/FOREVER_9898HD/GPV8000/EP8000/EPP8000 front panel the ET16315 driver IC
- * is wired as follows to the display (TODO/assumption: GPV/EP8000 are the same):
+ * In the VFD front panel the ET16315 driver IC is wired as follows:
  *
  *     aaaaaaa
  *    fh  j  kb
  *    f h j k b  q
  *    f  hjk  b
- * Q   gggimmm
+ *     gggimmm
  *    e  rpn  c
  *    e r p n c  q
  *    er  p  nc
  *     ddddddd
  *
- * SG1 -> segment a (0x01, value0) 
- * SG2 -> segment k (0x02, value0)
- * SG3 -> segment j (0x04, value0)
- * SG4 -> segment h (0x08, value0)
- * SG5 -> segment b (0x10, value0)
- * SG6 -> segment f (0x20, value0)
- * SG7 -> segment m (0x40, value0)
- * SG8 -> segment i (0x80, value0)
+ * SG0 -> seg a (0x01, value0) 
+ * SG1 -> seg k (0x02, value0)
+ * SG2 -> seg j (0x04, value0)
+ * SG3 -> seg h (0x08, value0)
+ * SG4 -> seg b (0x10, value0)
+ * SG5 -> seg f (0x20, value0)
+ * SG6 -> seg m (0x40, value0)
+ * SG7 -> seg i (0x80, value0)
  *
- * SG9 -> segment g (0x01, value1) 
- * SG10-> segment c (0x02, value1)
- * SG11-> segment e (0x04, value1)
- * SG12-> segment n (0x08, value1)
- * SG13-> segment p (0x10, value1)
- * SG14-> segment r (0x20, value1)
- * SG15-> segment d (0x40, value1)
- * SG16-> segment Q/q (0x80, value1) red dot on digit 1, colon on digits 2, 4 & 6
+ * SG8 -> seg g (0x01, value1) 
+ * SG9 -> seg c (0x02, value1)
+ * SGA -> seg e (0x04, value1)
+ * SGB -> seg n (0x08, value1)
+ * SGC -> seg p (0x10, value1)
+ * SGD -> seg r (0x20, value1)
+ * SGE -> seg d (0x40, value1)
+ * SGF -> seg q (0x80, value1) colon on digits 2, 4 & 6
  *
- * SG17-SG24 not connected -> all value2 are zero
+ * SG10 is a varied symbol above digit
+ * The left-right order is reversed:
+ * GR0 is connected to the rightmost digit 7, GR7 to the leftmost digit 0
  *
- * GR1 is connected to the rightmost digit 8, GR8 to the leftmost digit 1
- * (reverse of what you would expect)
- *
- * The characters below must be in ASCII order, starting at space (0x20).
+ * The characters below are in ASCII order, starting with space (0x20).
  */
-static struct et16315_char et16315_fp_chars[] =
+static et16315_char et16315_xlate[] =
 {
-  /*    value0      value1      value2                   */
+ /*    value0      value1      value2                   */
  /*  imfbhjka    qdrpnecg             <-display segment */
  /*  76543210    76543210    76543210                   */
  { 0b00000000, 0b00000000, 0b00000000 },  // 020, space 
@@ -153,6 +151,35 @@ static struct et16315_char et16315_fp_chars[] =
  { 0b11000000, 0b01000111, 0b00000000 }   // 07f, DEL
 };
 
+et16315_sym_addr et16315_sym_xlate[] =
+{
+  ET16315_SYM_DOLBY,
+  ET16315_SYM_DTS,
+  ET16315_SYM_VIDEO,
+  ET16315_SYM_AUDIO,
+  ET16315_SYM_LINK,
+  ET16315_SYM_HDD,
+  ET16315_SYM_DISC,
+  ET16315_SYM_DVB,
+  ET16315_SYM_EUR,
+  ET16315_SYM_PLAY,
+  ET16315_SYM_REW,
+  ET16315_SYM_PAUSE,
+  ET16315_SYM_FWD,
+  ET16315_SYM_NONE,
+  ET16315_SYM_REC,
+  ET16315_SYM_REDDOT,
+  ET16315_SYM_CLOCK1,
+  ET16315_SYM_CLOCK2,
+  ET16315_SYM_CARD,
+  ET16315_SYM_1,
+  ET16315_SYM_2,
+  ET16315_SYM_KEY,
+  ET16315_SYM_16_9,
+  ET16315_SYM_USB,
+  ET16315_SYM_DVD,
+};
+
 
 /****************************************************************************************
  *
@@ -160,13 +187,14 @@ static struct et16315_char et16315_fp_chars[] =
  *
  ****************************************************************************************/
 
-struct et16315_chip chip =
+et16315_chip chip =
 {
   .leds        = 0,
-  .mode        = et16315_config_11_digits_17_segments,
+  .mode        = et16315_11d_17s,
   .on          = 1,
   .brightness  = ET16315_MAX_BRIGHT,
-  .char_tbl    = et16315_fp_chars,
+  .display_data = {0},
+  .scratch      = {0},
 };
 
 
@@ -183,54 +211,37 @@ void et16315_xfer(byte command, void *buf, int len)
 }
 
 
-/* LED routine; control LED port pins */
-void et16315_set_leds(byte leds)
-{
-    byte data[1] = { (leds & 0b00001111) ^ 0b00001111 };
-    chip.leds = leds;
-    et16315_xfer(ET16315_CMD2_DATA_SET(0, ET16315_FIXED_ADDR, ET16315_CMD_SET_LED),
-                 data, 1);
-}
-
-
-/* Display routines */
 void et16315_clear()
 {
     // clear display RAM
     memset(chip.display_data, 0x00, sizeof(chip.display_data));
     memset(chip.scratch, 0x00, sizeof(chip.scratch));
-    et16315_xfer(ET16315_CMD2_DATA_SET(0, 0, ET16315_CMD_WRITE_DATA), NULL, 0);
-    et16315_xfer(ET16315_CMD3_SET_ADDRESS(0), chip.scratch, sizeof(chip.scratch));
+    et16315_xfer(ET16315_CMD2_SET_MODE(0, 0, ET16315_CMD_WRITE_DATA), NULL, 0);
+    et16315_xfer(ET16315_CMD3_SET_ADDR(0), chip.scratch, sizeof(chip.scratch));
 }
 
 
-void et16315_set_brightness(byte brght)
+void et16315_set_leds(byte leds)
 {
-    if (brght < 0)
-    {
-        brght = 0;
-    }
-    else if (brght > ET16315_MAX_BRIGHT)
-    {
-        brght = ET16315_MAX_BRIGHT;
-    }
-    chip.brightness = brght;
-    et16315_xfer(ET16315_CMD4_DISPLAY_CONTROL(chip.on, chip.brightness), NULL, 0);
+    byte data[1] = { (leds & 0b00001111) ^ 0b00001111 };
+    chip.leds = leds;
+    et16315_xfer(ET16315_CMD2_SET_MODE(0, 1, ET16315_CMD_SET_LED), data, 1);
 }
 
 
-void et16315_set_light(byte on)
+void et16315_set_light(byte on, byte brght)
 {
-    if (on < 0)
-    {
-        on = 0;
-    }
-    else if (on > 1)
+    if (on > 1)
     {
         on = 1;
     }
+    if (brght > ET16315_MAX_BRIGHT)
+    {
+        brght = ET16315_MAX_BRIGHT;
+    }
     chip.on = on;
-    et16315_xfer(ET16315_CMD4_DISPLAY_CONTROL(chip.on, chip.brightness), NULL, 0);
+    chip.brightness = brght;
+    et16315_xfer(ET16315_CMD4_DISP_CTRL(on, brght), NULL, 0);
 }
 
 
@@ -245,48 +256,64 @@ void et16315_set_text(const char *text, int len)
         len = digits;
     }
 
-    /* display digits are connected right to left */
+    /* Digits run backwards! */
     for (j=0, i = 3 * (digits-1); j<len && i >= 0; ++j, i -= 3)
     {
         char c = text[j];
-	if (c < 0x20) c = 0x20;
-	else if (c > 0x7E) c = 0x7E;
-	c -= 0x20;
+        if (c < 0x20) c = 0x20;
+        else if (c > 0x7E) c = 0x7E;
+        c -= 0x20;
 
-        chip.display_data[i]   = chip.char_tbl[c].value0;
-        chip.display_data[i+1] = chip.char_tbl[c].value1 | (chip.display_data[i+1] & 0b10000000);
-        chip.display_data[i+2] = chip.char_tbl[c].value2;
-        //chip.display_data[i+2] = 0x00;
+        chip.display_data[i]   = et16315_xlate[c].value0;
+        chip.display_data[i+1] = et16315_xlate[c].value1 | (chip.display_data[i+1] & 0b10000000);
+        chip.display_data[i+2] = et16315_xlate[c].value2;
     }
+    // Must copy to scratchpad since it gets overwritten by SPI routines!
     memcpy(chip.scratch, chip.display_data, digits*3);
-    et16315_xfer(ET16315_CMD2_DATA_SET(0, 0, ET16315_CMD_WRITE_DATA), NULL, 0);
-    et16315_xfer(ET16315_CMD3_SET_ADDRESS(0), chip.scratch, digits*3);
+    et16315_xfer(ET16315_CMD2_SET_MODE(0, 0, ET16315_CMD_WRITE_DATA), NULL, 0);
+    et16315_xfer(ET16315_CMD3_SET_ADDR(0), chip.scratch, digits*3);
 }
 
 
-void et16315_colon(byte i, byte o)
+void et16315_set_colon(byte i, byte on)
 {
     int a;
     char c;
 
     if (i > 3) i = 3;
     a = 3*8 - (3*2*i) + 1;
-    //Serial.print("a: "); Serial.println(a);
     c = chip.display_data[a];
-    if (o) {
-        c = c | 0b10000000;
+    if (on) {
+        c |= 0b10000000;
     }
     else {
-        c = c & 0b01111111;
+        c &= 0b01111111;
     }
     chip.display_data[a] = c;
-    et16315_xfer(ET16315_CMD2_DATA_SET(0, 1, ET16315_CMD_WRITE_DATA), NULL, 0);
-    et16315_xfer(ET16315_CMD3_SET_ADDRESS(a), &c, 1);
-    delay(10);
+    et16315_xfer(ET16315_CMD2_SET_MODE(0, 1, ET16315_CMD_WRITE_DATA), NULL, 0);
+    et16315_xfer(ET16315_CMD3_SET_ADDR(a), &c, 1);
 }
 
 
-int et16315_start(void)
+void et16315_set_symbol(et16315_symbol s, byte on)
+{
+    et16315_sym_addr sym_a = et16315_sym_xlate[s];
+    char c = chip.display_data[sym_a.addr];
+    if (on) {
+        // set bit
+        c |= sym_a.bit;
+    }
+    else {
+        // clear bit
+        c &= (sym_a.bit ^ 0xFF);
+    }
+    chip.display_data[sym_a.addr] = c;
+    et16315_xfer(ET16315_CMD2_SET_MODE(0, 1, ET16315_CMD_WRITE_DATA), NULL, 0);
+    et16315_xfer(ET16315_CMD3_SET_ADDR(sym_a.addr), &c, 1);
+}
+
+
+void et16315_start(void)
 {
     /* Initialize the ET16315 */
     pinMode(SS_PIN, OUTPUT);
@@ -294,63 +321,14 @@ int et16315_start(void)
 
     /* Clear display memory */
     et16315_clear();
+
     /* Set display mode and initial brightness */
     Serial.print("Mode: ");
     Serial.println(chip.mode);
-    et16315_xfer(ET16315_CMD1_SET_DISPLAY_MODE(chip.mode), NULL, 0);
-    // enable display
-    et16315_set_light(1);
-    // set initial brightness
-    et16315_set_brightness(ET16315_MAX_BRIGHT);
-    return 0;
-}
+    et16315_xfer(ET16315_CMD1_SET_DISP(chip.mode), NULL, 0);
 
-
-int et16315_seticon(int which, int on)
-{
-    byte ret = 0;
-    byte digit_offset;
-    byte digits;
-
-    digits = chip.mode + 4;
-    switch(which)
-    {
-        case ICON_DOT:
-        {
-            digit_offset = 7 * 3 + 1;
-            break;
-        }
-        case ICON_COLON1:
-        {
-            digit_offset = 6 * 3 + 1;
-            break;
-        }
-        case ICON_COLON2:
-        {
-            digit_offset = 4 * 3 + 1;
-            break;
-        }
-        case ICON_COLON3:
-        {
-            digit_offset = 2 * 3 + 1;
-            break;
-        }
-        default:
-        {
-            return -1;
-        }
-    }
-
-    if (on < 1) {
-        chip.display_data[digit_offset] &= 0b01111111;
-    }
-    else {
-        chip.display_data[digit_offset] |= 0b10000000;
-    }
-    et16315_xfer(ET16315_CMD3_SET_ADDRESS(0),
-                 chip.display_data, (digits * 3));
-
-    return ret;
+    // Enable display, set brightness
+    et16315_set_light(1, ET16315_MAX_BRIGHT);
 }
 
 

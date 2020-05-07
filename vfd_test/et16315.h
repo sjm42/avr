@@ -8,10 +8,6 @@
 
 #define SS_PIN 10
 
-/* Comment or delete next line to enable text
-   scrolling in low level VFD driver */
-#define VFD_SCROLL     1
-
 /* ET16315 command bytes
  
 1. Display set command: 0b00XXnnnn
@@ -27,21 +23,21 @@
  0111  11 digits, 17 segments
  1XXX  12 digits, 16 segments
 */
-#define ET16315_CMD1_SET_DISPLAY_MODE(mode) \
+#define ET16315_CMD1_SET_DISP(mode) \
 		(0x00 | ((mode) & 0x0F))
 
 #define ET16315_TEST_MODE      0b00001000  // -> option = + 0x08
-#define ET16315_FIXED_ADDR     0b00000100  // -> option = + 0x04
-#define ET16315_AUTO_ADDR_INC  0b00000000  // -> option = + 0x00
+#define ET16315_ADDR_FIX       0b00000100  // -> option = + 0x04
+#define ET16315_ADDR_INC       0b00000000  // -> option = + 0x00
 #define ET16315_CMD_WRITE_DATA 0b00000000  // -> option = + 0x00
 #define ET16315_CMD_SET_LED    0b00000001  // -> option = + 0x01
 #define ET16315_CMD_READ_KEY   0b00000010  // -> option = + 0x02
 #define ET16315_CMD_DONTCARE   0b00000011  // not used
 
-#define ET16315_CMD2_DATA_SET(test_mode, fixed_address, command) \
+#define ET16315_CMD2_SET_MODE(test_mode, fixed_address, command) \
 		(0b01000000 | \
 		(test_mode ? ET16315_TEST_MODE : 0x00) | \
-		(fixed_address ? ET16315_FIXED_ADDR : ET16315_AUTO_ADDR_INC) | \
+		(fixed_address ? ET16315_ADDR_FIX : ET16315_ADDR_INC) | \
 		(command & 0x3))
 
 /*
@@ -51,7 +47,7 @@
  (digit * 3) + 1 is address of MB data (2nd display data byte)
  (digit * 3) + 2 is address of HB data (3rd display data byte)
 */
-#define ET16315_CMD3_SET_ADDRESS(address) \
+#define ET16315_CMD3_SET_ADDR(address) \
 		(0b11000000 | (address & 0b00111111))
 
 #define ET16315_DISPLAY_ENABLE 0b00001000
@@ -62,63 +58,116 @@
     1=Display on
  bbb = brightness level, 000 is lowest
 */
-#define ET16315_CMD4_DISPLAY_CONTROL(on, brightness) \
+#define ET16315_CMD4_DISP_CTRL(on, brightness) \
 		(0b10000000 | \
 		(on ? ET16315_DISPLAY_ENABLE : 0x00) | \
 		(brightness & 0b00000111))
 
-#define ET16315_MAX_BRIGHT 7
-#define ET16315_DISPLAY_MAX_DIGITS   12
-#define ET16315_DISPLAY_BUFFER_SIZE  ET16315_DISPLAY_MAX_DIGITS * 3
+#define ET16315_MAX_BRIGHT   7
+#define ET16315_MAX_DIGITS  12
+#define ET16315_BUFFER_SIZE ET16315_MAX_DIGITS * 3
 
-struct et16315_char
+#define ET16315_SYM_DOLBY  { 2, 0b00000001}
+#define ET16315_SYM_DTS    { 5, 0b00000001}
+#define ET16315_SYM_VIDEO  { 8, 0b00000001}
+#define ET16315_SYM_AUDIO  {11, 0b00000001}
+#define ET16315_SYM_LINK   {14, 0b00000001}
+#define ET16315_SYM_HDD    {17, 0b00000001}
+#define ET16315_SYM_DISC   {20, 0b00000001}
+#define ET16315_SYM_DVB    {23, 0b00000001}
+#define ET16315_SYM_EUR    {24, 0b00000001}
+#define ET16315_SYM_PLAY   {24, 0b00000010}
+#define ET16315_SYM_REW    {24, 0b00000100}
+#define ET16315_SYM_PAUSE  {24, 0b00001000}
+#define ET16315_SYM_FWD    {24, 0b00010000}
+#define ET16315_SYM_NONE   {24, 0b00100000}
+#define ET16315_SYM_REC    {24, 0b01000000}
+#define ET16315_SYM_REDDOT {24, 0b10000000}
+#define ET16315_SYM_CLOCK1 {25, 0b00000001}
+#define ET16315_SYM_CLOCK2 {25, 0b00000010}
+#define ET16315_SYM_CARD   {25, 0b00000100}
+#define ET16315_SYM_1      {25, 0b00001000}
+#define ET16315_SYM_2      {25, 0b00010000}
+#define ET16315_SYM_KEY    {25, 0b00100000}
+#define ET16315_SYM_16_9   {25, 0b01000000}
+#define ET16315_SYM_USB    {25, 0b10000000}
+#define ET16315_SYM_DVD    {26, 0b00000001}
+
+typedef enum
+{
+  et16315_sym_DOLBY = 0,
+  et16315_sym_DTS,
+  et16315_sym_VIDEO,
+  et16315_sym_AUDIO,
+  et16315_sym_LINK,
+  et16315_sym_HDD,
+  et16315_sym_DISC,
+  et16315_sym_DVB,
+  et16315_sym_EUR,
+  et16315_sym_PLAY,
+  et16315_sym_REW,
+  et16315_sym_PAUSE,
+  et16315_sym_FWD,
+  et16315_sym_NONE,
+  et16315_sym_REC,
+  et16315_sym_REDDOT,
+  et16315_sym_CLOCK1,
+  et16315_sym_CLOCK2,
+  et16315_sym_CARD,
+  et16315_sym_1,
+  et16315_sym_2,
+  et16315_sym_KEY,
+  et16315_sym_16_9,
+  et16315_sym_USB,
+  et16315_sym_DVD,
+} et16315_symbol;
+
+typedef struct
+{
+    byte addr;
+    byte bit;
+} et16315_sym_addr;
+
+typedef struct
 {
 	byte value0;
 	byte value1;
-	byte value2;  // not needed with 15 segment display, always zero
-};
+	byte value2;
+} et16315_char;
 
-struct et16315_chip
+typedef struct
 {
 	/* LEDs */
 	byte leds;
 	/* VFD display */
 	byte mode;
-	byte on; // state of display enable
+	byte on;
 	byte brightness;
-	struct et16315_char *char_tbl;
-        byte display_data[ET16315_DISPLAY_BUFFER_SIZE];
-        byte scratch[ET16315_DISPLAY_BUFFER_SIZE];
-};
+    byte display_data[ET16315_BUFFER_SIZE];
+    byte scratch[ET16315_BUFFER_SIZE];
+} et16315_chip;
 
-enum {
-      et16315_config_4_digits_24_segments = 0,
-      et16315_config_5_digits_23_segments,
-      et16315_config_6_digits_22_segments,
-      et16315_config_7_digits_21_segments,
-      et16315_config_8_digits_20_segments,
-      et16315_config_9_digits_19_segments,
-      et16315_config_10_digits_18_segments,
-      et16315_config_11_digits_17_segments,
-      et16315_config_12_digits_16_segments
-};
-
-enum {
-      ICON_DOT = 42,
-      ICON_COLON1,
-      ICON_COLON2,
-      ICON_COLON3
-};
+// ET16315 display modes: d digits, s segments
+typedef enum {
+      et16315_4d_24s = 0,
+      et16315_5d_23s,
+      et16315_6d_22s,
+      et16315_7d_21s,
+      et16315_8d_20s,
+      et16315_9d_19s,
+      et16315_10d_18s,
+      et16315_11d_17s,
+      et16315_12d_16s
+} et16315_display_mode;
 
 void et16315_xfer(byte command, void *buf, int len);
-void et16315_set_leds(byte leds);
 void et16315_clear();
-void et16315_set_brightness(byte brght);
-void et16315_set_light(byte on);
+void et16315_set_leds(byte leds);
+void et16315_set_light(byte on, byte brght);
 void et16315_set_text(const char *text, int len);
-int et16315_start(void);
-int et16315_seticon(int which, int on);
-void et16315_colon(byte i, byte o);
+void et16315_set_colon(byte i, byte on);
+void et16315_set_colon(et16315_symbol s, byte on);
+void et16315_start(void);
 
 
 #endif // _et16315_h
