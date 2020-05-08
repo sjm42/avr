@@ -295,7 +295,7 @@ void et16315_set_colon(byte i, byte on)
 }
 
 
-void et16315_set_symbol(et16315_symbol s, byte on)
+void et16315_set_symbol(byte s, byte on)
 {
     et16315_sym_addr sym_a = et16315_sym_xlate[s];
     char c = chip.display_data[sym_a.addr];

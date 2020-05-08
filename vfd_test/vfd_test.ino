@@ -49,7 +49,7 @@ void vfd_test()
     et16315_set_text(buf, 8);
     delay(1000);
 
-#if 1
+#if 0
     for (a = 24; a<36; ++a) {
         snprintf(pbuf, BLEN, "Addr: %02d", a);
         Serial.println(pbuf);
@@ -83,6 +83,23 @@ void vfd_test()
         c = 0;
         et16315_xfer(ET16315_CMD2_SET_MODE(0, 1, ET16315_CMD_WRITE_DATA), NULL, 0);
         et16315_xfer(ET16315_CMD3_SET_ADDR(a), &c, 1);
+    }
+#endif
+
+#if 1
+    memset(buf, '8', 8);
+    et16315_set_text(buf, 8);
+
+    for (i = et16315_sym_DOLBY; i <= et16315_sym_DVD; ++i) {
+        et16315_set_symbol(i, 1);
+        delay(500);
+        et16315_set_symbol(i, 0);
+    }
+    delay(1000);
+    for (i = et16315_sym_DVD; i >= et16315_sym_DOLBY; --i) {
+        et16315_set_symbol(i, 1);
+        delay(500);
+        et16315_set_symbol(i, 0);
     }
 #endif
 }

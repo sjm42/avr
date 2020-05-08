@@ -93,7 +93,7 @@
 #define ET16315_SYM_USB    {25, 0b10000000}
 #define ET16315_SYM_DVD    {26, 0b00000001}
 
-typedef enum
+enum et16315_symbol
 {
   et16315_sym_DOLBY = 0,
   et16315_sym_DTS,
@@ -120,7 +120,7 @@ typedef enum
   et16315_sym_16_9,
   et16315_sym_USB,
   et16315_sym_DVD,
-} et16315_symbol;
+};
 
 typedef struct
 {
@@ -166,7 +166,7 @@ void et16315_set_leds(byte leds);
 void et16315_set_light(byte on, byte brght);
 void et16315_set_text(const char *text, int len);
 void et16315_set_colon(byte i, byte on);
-void et16315_set_colon(et16315_symbol s, byte on);
+void et16315_set_symbol(byte s, byte on);
 void et16315_start(void);
 
 
