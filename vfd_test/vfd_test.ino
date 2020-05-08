@@ -4,8 +4,6 @@
 #include "et16315.h"
 
 #define DEBUG 1
-#define BLEN 40
-static char pbuf[BLEN];
 
 #define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
 #define BYTE_TO_BINARY(byte)  \
@@ -23,7 +21,7 @@ void vfd_test()
     char c, buf[8];
     int a, i, j, k;
 
-#if 1
+#if 0
     for (i=0x30; i<0x80; i += 8) {
         for (j=0; j<8; ++j) {
             buf[j] = i+j;
@@ -92,15 +90,20 @@ void vfd_test()
 
     for (i = et16315_sym_DOLBY; i <= et16315_sym_DVD; ++i) {
         et16315_set_symbol(i, 1);
-        delay(500);
+        delay(200);
         et16315_set_symbol(i, 0);
     }
-    delay(1000);
+    delay(500);
     for (i = et16315_sym_DVD; i >= et16315_sym_DOLBY; --i) {
         et16315_set_symbol(i, 1);
-        delay(500);
+        delay(200);
         et16315_set_symbol(i, 0);
     }
+#endif
+
+#if 1
+#define mytext "FUCK THIS SHIT."
+    et16315_scroll(mytext, sizeof(mytext), 42);
 #endif
 }
 

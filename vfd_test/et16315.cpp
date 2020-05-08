@@ -5,6 +5,7 @@
 #include "et16315.h"
 
 #define DISP_SIZE 8
+static char pbuf[BLEN];
 
 /****************************************************************************************
  *
@@ -247,17 +248,15 @@ void et16315_set_light(byte on, byte brght)
 
 void et16315_set_text(const char *text, int len)
 {
-    byte digits;
     char i, j;
 
-    digits = 8;
-    if (len > digits)
+    if (len > DISP_SIZE)
     {
-        len = digits;
+        len = DISP_SIZE;
     }
 
     /* Digits run backwards! */
-    for (j=0, i = 3 * (digits-1); j<len && i >= 0; ++j, i -= 3)
+    for (j=0, i = 3 * (DISP_SIZE-1); j<len && i >= 0; ++j, i -= 3)
     {
         char c = text[j];
         if (c < 0x20) c = 0x20;
@@ -269,9 +268,31 @@ void et16315_set_text(const char *text, int len)
         chip.display_data[i+2] = et16315_xlate[c].value2;
     }
     // Must copy to scratchpad since it gets overwritten by SPI routines!
-    memcpy(chip.scratch, chip.display_data, digits*3);
+    memcpy(chip.scratch, chip.display_data, DISP_SIZE*3);
     et16315_xfer(ET16315_CMD2_SET_MODE(0, 0, ET16315_CMD_WRITE_DATA), NULL, 0);
-    et16315_xfer(ET16315_CMD3_SET_ADDR(0), chip.scratch, digits*3);
+    et16315_xfer(ET16315_CMD3_SET_ADDR(0), chip.scratch, DISP_SIZE*3);
+}
+
+
+void et16315_scroll(const char *text, int len, byte times)
+{
+    int i;
+    byte r;
+    
+    if (len <= DISP_SIZE) {
+        memset(pbuf, ' ', DISP_SIZE);
+        memcpy(pbuf, text, len);
+        et16315_set_text(pbuf, DISP_SIZE);
+        return
+    }
+
+    for (r=0; r < times; ++r) {
+        for (i=0; i <= (len-DISP_SIZE); ++i) {
+            et16315_set_text(text+i, DISP_SIZE);
+            delay(300);
+        }
+        delay(500);
+    }
 }
 
 
@@ -281,7 +302,7 @@ void et16315_set_colon(byte i, byte on)
     char c;
 
     if (i > 3) i = 3;
-    a = 3*8 - (3*2*i) + 1;
+    a = 3*DISP_SIZE - (3*2*i) + 1;
     c = chip.display_data[a];
     if (on) {
         c |= 0b10000000;

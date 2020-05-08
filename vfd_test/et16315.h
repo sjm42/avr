@@ -7,6 +7,11 @@
 #include <SPI.h>
 
 #define SS_PIN 10
+#define BLEN 80
+
+#define ET16315_MAX_BRIGHT   7
+#define ET16315_MAX_DIGITS  12
+#define ET16315_BUFFER_SIZE (ET16315_MAX_DIGITS * 3)
 
 /* ET16315 command bytes
  
@@ -63,9 +68,6 @@
 		(on ? ET16315_DISPLAY_ENABLE : 0x00) | \
 		(brightness & 0b00000111))
 
-#define ET16315_MAX_BRIGHT   7
-#define ET16315_MAX_DIGITS  12
-#define ET16315_BUFFER_SIZE ET16315_MAX_DIGITS * 3
 
 #define ET16315_SYM_DOLBY  { 2, 0b00000001}
 #define ET16315_SYM_DTS    { 5, 0b00000001}
