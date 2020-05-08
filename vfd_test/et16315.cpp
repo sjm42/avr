@@ -278,20 +278,17 @@ void et16315_scroll(const char *text, int len, byte times)
 {
     int i;
     byte r;
-    
-    if (len <= DISP_SIZE) {
-        memset(pbuf, ' ', DISP_SIZE);
-        memcpy(pbuf, text, len);
-        et16315_set_text(pbuf, DISP_SIZE);
-        return
-    }
 
+    if (len > BLEN - 2*DISP_SIZE) len = BLEN - 2*DISP_SIZE;
+    memset(pbuf, ' ', DISP_SIZE);
+    memcpy(pbuf + DISP_SIZE, text, len);
+    memset(pbuf + DISP_SIZE + len, ' ', DISP_SIZE);
     for (r=0; r < times; ++r) {
-        for (i=0; i <= (len-DISP_SIZE); ++i) {
-            et16315_set_text(text+i, DISP_SIZE);
-            delay(300);
+        for (i = 0; i <= len+DISP_SIZE; ++i) {
+            et16315_set_text(pbuf+i, DISP_SIZE);
+            delay(200);
         }
-        delay(500);
+        delay(200);
     }
 }
 

@@ -84,7 +84,7 @@ void vfd_test()
     }
 #endif
 
-#if 1
+#if 0
     memset(buf, '8', 8);
     et16315_set_text(buf, 8);
 
@@ -101,9 +101,41 @@ void vfd_test()
     }
 #endif
 
+#if 0
+    while (1) {
+        memcpy(buf, "  FUCK   ", 8);
+	et16315_set_text(buf, 8);
+	delay(200);
+	//memset(buf, ' ', 8);
+	//et16315_set_text(buf, 8);
+	//delay(100);
+
+	memcpy(buf, "  THIS   ", 8);
+	et16315_set_text(buf, 8);
+	delay(200);
+	//memset(buf, ' ', 8);
+	//et16315_set_text(buf, 8);
+	//delay(100);
+
+	memcpy(buf, "  SHIT  ", 8);
+	et16315_set_text(buf, 8);
+	delay(200);
+	//memset(buf, ' ', 8);
+	//et16315_set_text(buf, 8);
+	//delay(100);
+
+	delay(500);
+    }
+#endif
+
 #if 1
+    et16315_scroll("FUCK", 4, 1);
+    et16315_scroll("THIS", 4, 1);
+    et16315_scroll("SHIT", 4, 1);
+
 #define mytext "FUCK THIS SHIT."
     et16315_scroll(mytext, sizeof(mytext), 42);
+
 #endif
 }
 

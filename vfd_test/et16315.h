@@ -167,6 +167,7 @@ void et16315_clear();
 void et16315_set_leds(byte leds);
 void et16315_set_light(byte on, byte brght);
 void et16315_set_text(const char *text, int len);
+void et16315_scroll(const char *text, int len, byte times);
 void et16315_set_colon(byte i, byte on);
 void et16315_set_symbol(byte s, byte on);
 void et16315_start(void);
