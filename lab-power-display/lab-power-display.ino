@@ -6,7 +6,9 @@
 
 Adafruit_ADS1115 ads;
 
-#define I2C_ADDR 69
+#define RUN_CALIBRATION 0
+
+// #define I2C_ADDR 69
 
 #define BUFSZ 80
 char buf[BUFSZ];
@@ -22,8 +24,18 @@ char buf[BUFSZ];
 #define CH1_OFFSET 0
 #define CH2_OFFSET 5
 
+// CALIBRATION DATA -- to be determined by actual measurements.
+
+// number to be subtracted from adc A reading with various output voltages
+#define A_FACTOR 4348.33
+#define A_OFFSET_0 42
+#define A_OFFSET_PER_10V 30.0
+// voltage ADC count per 1V
+// #define V_FACTOR 785.824
+#define V_FACTOR 785.0
+
 //delay before incrementing the counter
-#define delayTime 2000
+#define DELAY_CALIBR 2000
 
 //the uninitilized controller object
 LedController<SEGMENTS, 1> lc = LedController<SEGMENTS, 1>();
@@ -32,19 +44,6 @@ LedController<SEGMENTS, 1> lc = LedController<SEGMENTS, 1>();
 unsigned long long getLargestNumber()
 {
     return (unsigned long long)pow(10, SEGMENTS * DIGITS);
-}
-
-// useless?
-void clear_leds()
-{
-    //disables all Digits by default
-    for (unsigned int i = 0; i < SEGMENTS; i++)
-    {
-        for (unsigned int j = 0; j < 8; j++)
-        {
-            lc.setRow(i, j, 0x00);
-        }
-    }
 }
 
 void init_leds()
@@ -75,6 +74,38 @@ void set_leds(unsigned long number)
     }
 }
 
+// returns voltage times 100
+int16_t calc_volt(int16_t adc)
+{
+    return (int16_t)(100.0 * ((float)adc / V_FACTOR) + 0.5);
+}
+
+// returns amps times 100
+int16_t calc_amp(int16_t adc, int16_t volt)
+{
+    int16_t offset = A_OFFSET_0 + (int16_t)(((float)volt / 1000.0) * A_OFFSET_PER_10V);
+    return (int16_t)(100.0 * ((float)(adc - offset) / A_FACTOR) + 0.5);
+}
+
+void update_leds(int16_t ch0, int16_t ch1)
+{
+    int16_t volt = calc_volt(ch1);
+    if (volt < 0)
+        volt = 0;
+
+    int16_t amp = calc_amp(ch0, volt);
+    if (amp < 0)
+        amp = 0;
+
+    lc.setDigit(0, 0, amp % 10, false);
+    lc.setDigit(0, 1, (amp / 10) % 10, false);
+    lc.setDigit(0, 2, (amp / 100) % 10, true);
+    lc.setDigit(0, 4, volt % 10, false);
+    lc.setDigit(0, 5, (volt / 10) % 10, false);
+    lc.setDigit(0, 6, (volt / 100) % 10, true);
+    lc.setDigit(0, 7, (volt / 1000) % 10, false);
+}
+
 void setup()
 {
     Serial.begin(115200);
@@ -97,6 +128,7 @@ void setup()
 
 void loop()
 {
+#if RUN_CALIBRATION
     while (1)
     {
         // Measure current
@@ -115,7 +147,26 @@ void loop()
         Serial.println(a1);
         lc.setDigit(0, 7, 1, true);
         set_leds(a1);
-        delay(delayTime);
+        delay(DELAY_CALIBR);
     }
+#else
+    while (1)
+    {
+        // Measure current
+        ads.setGain(GAIN_SIXTEEN);
+        int16_t a0 = ads.readADC_Differential_0_1();
+        if (a0 < 0)
+            a0 = 0;
+
+        // Measure voltage
+        ads.setGain(GAIN_ONE);
+        int16_t a1 = ads.readADC_Differential_2_3();
+        if (a1 < 0)
+            a1 = 0;
+
+        // update display
+        update_leds(a0, a1);
+    }
+#endif
 }
 // EOF
