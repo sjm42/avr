@@ -1,5 +1,6 @@
 // lab-power-display.ino
 
+#include <Arduino.h>
 #include <stdlib.h>
 #include "LedController.hpp"
 #include <Adafruit_ADS1X15.h>
@@ -7,44 +8,36 @@
 Adafruit_ADS1115 ads;
 
 #define RUN_CALIBRATION 0
-
-// #define I2C_ADDR 69
-
-#define BUFSZ 80
-char buf[BUFSZ];
-
 #define PIN_LED 13
-
 #define LED_BRIGHTNESS 4
 #define CS 10
 #define SEGMENTS 1
 #define DIGITS 5
 #define POS_OFFSET 1
-
 #define CH1_OFFSET 0
 #define CH2_OFFSET 5
 
-// CALIBRATION DATA -- to be determined by actual measurements.
+// *** CALIBRATION DATA
+// *** to be determined by actual measurements.
 
 // number to be subtracted from adc A reading with various output voltages
-#define A_FACTOR 4348.33
 #define A_OFFSET_0 42
 #define A_OFFSET_PER_10V 30.0
-// voltage ADC count per 1V
-// #define V_FACTOR 785.824
+
+// current ADC count per 1.0A
+#define A_FACTOR 4348.33
+
+// voltage ADC count per 1.0V
 #define V_FACTOR 785.0
 
 //delay before incrementing the counter
 #define DELAY_CALIBR 2000
 
-//the uninitilized controller object
-LedController<SEGMENTS, 1> lc = LedController<SEGMENTS, 1>();
+// ***
+// *** END OF CALIBRATION DATA
 
-//This function calculates the largest number that can be displayed
-unsigned long long getLargestNumber()
-{
-    return (unsigned long long)pow(10, SEGMENTS * DIGITS);
-}
+// the uninitilized 7seg controller object
+LedController<SEGMENTS, 1> lc = LedController<SEGMENTS, 1>();
 
 void init_leds()
 {
