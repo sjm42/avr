@@ -3,6 +3,7 @@
 #include <Arduino.h>
 
 #define PIN_PWM 4
+#define SERIAL_SPEED 9600
 
 // we define a dead simple protocol: 0x00 0xFF followed with command byte and value.
 // Right now we only define command byte 0x01 (:
@@ -12,7 +13,7 @@
 
 void setup()
 {
-    Serial.begin(9600);
+    Serial.begin(SERIAL_SPEED);
     Serial.println("Starting...");
 
     pinMode(PIN_PWM, OUTPUT);
@@ -21,16 +22,14 @@ void setup()
     Serial.println("Setup complete.");
 }
 
-byte read_ser()
+void loop()
 {
-    // block until we have something
+    byte cmd, val;
     while (1)
     {
-        if (Serial.available())
-        {
-            byte c = Serial.read();
-            return c;
-        }
+        cmd = read_cmd(&val);
+        if (cmd == CMD_SETV)
+            analogWrite(PIN_PWM, val);
     }
 }
 
@@ -42,29 +41,32 @@ byte read_cmd(byte *value)
 
     while (1)
     {
-        // seek for cmd0
-        while (read_ser() != CMD_START1)
+        // seek for start sequence
+        while (read_byte() != CMD_START1)
             ;
-        // seek for cmd1
-        if (read_ser() != CMD_START2)
+
+        // next in sequence
+        if (read_byte() != CMD_START2)
             continue;
 
         // read cmd byte
-        c = read_ser();
+        c = read_byte();
         // read value
-        *value = read_ser();
+        *value = read_byte();
         return c;
     }
 }
 
-void loop()
+byte read_byte()
 {
-    byte cmd, val;
+    // Brutal: stay in busyloop until we have something
     while (1)
     {
-        cmd = read_cmd(&val);
-        if (cmd == CMD_SETV)
-            analogWrite(PIN_PWM, val);
+        if (Serial.available())
+        {
+            byte c = Serial.read();
+            return c;
+        }
     }
 }
 // EOF
