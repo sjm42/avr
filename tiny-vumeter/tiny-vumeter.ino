@@ -11,6 +11,27 @@
 #define CMD_START2 0xFF
 #define CMD_SETV 0x01
 
+void hello()
+{
+    byte i = 1;
+    byte up = 1;
+    while (i)
+    {
+        analogWrite(PIN_PWM, i);
+        if (up)
+        {
+            if (i == 0xff)
+                up = 0;
+            else
+                ++i;
+        }
+        else
+            --i;
+        delay(10);
+    }
+    analogWrite(PIN_PWM, 0);
+}
+
 void setup()
 {
     Serial.begin(SERIAL_SPEED);
@@ -18,6 +39,7 @@ void setup()
 
     pinMode(PIN_PWM, OUTPUT);
     analogWrite(PIN_PWM, 0);
+    hello();
 
     Serial.println("Setup complete.");
 }
