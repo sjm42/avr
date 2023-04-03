@@ -1,0 +1,2 @@
+SSID="iot"
+PASSWORD="internetofshit"
